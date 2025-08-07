@@ -1,0 +1,40 @@
+services:
+  api_default:
+    container_name: rinha_slim_api_default
+    build:
+      context: ./docker/dockerfiles/php
+    ports:
+      - '9000:9000'
+    networks:
+      - rinha_slim
+    volumes:
+      - .:/var/www/slim-rest-api
+  nginx:
+    container_name: rinha_slim_nginx
+    image: nginx:stable-alpine
+    ports:
+      - '8080:80'
+    networks:
+      - rinha_slim
+    volumes:
+      - .:/var/www/slim-rest-api
+      - ./docker/config/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - api_default
+
+  redis:
+    container_name: rinha_slim_redis
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - rinha_slim
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: "60MB"
+
+networks:
+  rinha_slim:
+    driver: bridge

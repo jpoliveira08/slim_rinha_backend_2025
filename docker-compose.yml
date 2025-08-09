@@ -7,15 +7,18 @@ services:
       - '9000:9000'
     networks:
       - rinha_slim
+      - payment-processor
     volumes:
       - .:/var/www/slim-rest-api
+
   nginx:
     container_name: rinha_slim_nginx
     image: nginx:stable-alpine
     ports:
-      - '8080:80'
+      - '9999:80'
     networks:
       - rinha_slim
+      - payment-processor
     volumes:
       - .:/var/www/slim-rest-api
       - ./docker/config/nginx/default.conf:/etc/nginx/conf.d/default.conf
@@ -29,6 +32,7 @@ services:
       - "6379:6379"
     networks:
       - rinha_slim
+      - payment-processor
     deploy:
       resources:
         limits:
@@ -38,3 +42,5 @@ services:
 networks:
   rinha_slim:
     driver: bridge
+  payment-processor:
+    external: true

@@ -1,15 +1,33 @@
 services:
-  api_default:
-    container_name: rinha_slim_api_default
+  api_1:
+    container_name: rinha_slim_api_1
     build:
       context: ./docker/dockerfiles/php
+      args:
+        UID: ${UID}
+        GID: ${GID}
     ports:
       - '9000:9000'
     networks:
       - rinha_slim
       - payment-processor
     volumes:
-      - .:/var/www/slim-rest-api
+      - .:/var/www/html
+
+  api_2:
+    container_name: rinha_slim_api_2
+    build:
+      context: ./docker/dockerfiles/php
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    ports:
+      - '9001:9000'
+    networks:
+      - rinha_slim
+      - payment-processor
+    volumes:
+      - .:/var/www/html
 
   nginx:
     container_name: rinha_slim_nginx
@@ -20,10 +38,11 @@ services:
       - rinha_slim
       - payment-processor
     volumes:
-      - .:/var/www/slim-rest-api
+      - .:/var/www/html
       - ./docker/config/nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
-      - api_default
+      - api_1
+      - api_2
 
   redis:
     container_name: rinha_slim_redis

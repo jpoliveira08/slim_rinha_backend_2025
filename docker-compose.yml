@@ -13,6 +13,11 @@ services:
       - payment-processor
     volumes:
       - .:/var/www/html
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '100M'
 
   api_2:
     container_name: rinha_slim_api_2
@@ -28,6 +33,32 @@ services:
       - payment-processor
     volumes:
       - .:/var/www/html
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '100M'
+
+  worker:
+    container_name: rinha_slim_worker
+    build:
+      context: ./docker/dockerfiles/php
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    command: php /var/www/html/worker/worker.php
+    networks:
+      - rinha_slim
+      - payment-processor
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: '80M'
 
   nginx:
     container_name: rinha_slim_nginx
@@ -43,6 +74,11 @@ services:
     depends_on:
       - api_1
       - api_2
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: '50M'
 
   redis:
     container_name: rinha_slim_redis
@@ -55,8 +91,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "60MB"
+          cpus: '0.2'
+          memory: '60M'
 
 networks:
   rinha_slim:

@@ -19,3 +19,5 @@ cache.properties
 # Composer
 composer.phar
 composer.lock
+
+README.md

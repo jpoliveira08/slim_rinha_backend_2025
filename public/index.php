@@ -25,8 +25,8 @@ $container->set('redis.host', $_ENV['REDIS_HOST']);
 $container->set('redis.port', (int)$_ENV['REDIS_PORT']);
 
 $container->set(ProcessPaymentAction::class, function ($container) {
-    return new ProcessPaymentAction($container->get(
-        'payment.main_url'),
+    return new ProcessPaymentAction(
+        $container->get('payment.main_url'),
         $container->get(HttpClientService::class)
     );
 });

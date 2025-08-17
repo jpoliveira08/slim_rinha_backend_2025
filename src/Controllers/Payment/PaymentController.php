@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RinhaSlim\App\Controllers\Payment;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use RinhaSlim\App\Actions\PaymentProcessor\ProcessPaymentAction;
@@ -32,7 +33,7 @@ readonly class PaymentController
         $paymentData = [
             'correlationId' => $body['correlationId'],
             'amount' => $body['amount'],
-            'createdAt' => new DateTimeImmutable()->format('Y-m-d H:i:s'),
+            'createdAt' => new DateTimeImmutable('now', new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.v\Z'),
         ];
 
         // Try main processor first

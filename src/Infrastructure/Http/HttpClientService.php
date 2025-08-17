@@ -7,8 +7,6 @@ namespace RinhaSlim\App\Infrastructure\Http;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ConnectException;
-use DateTimeZone;
-use DateTimeImmutable;
 
 readonly class HttpClientService
 {
@@ -19,79 +17,69 @@ readonly class HttpClientService
         $this->client = new Client([
             'timeout' => 5,
             'connect_timeout' => 3,
-            'http_errors' => false // We'll handle errors manually
+            'http_errors' => false,
         ]);
     }
 
-    public function makePaymentRequest(string $url, array $paymentData): array
+    /**
+     * Generic HTTP request method
+     */
+    public function request(string $method, string $url, array $options = []): array
     {
         try {
-            $response = $this->client->post($url, [
-                'json' => [
-                    'correlationId' => $paymentData['correlationId'],
-                    'amount' => $paymentData['amount'],
-                    'timestamp' => $paymentData['createdAt'] ?? (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format(DATE_ATOM)
-                ],
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'User-Agent' => 'RinhaSlim-PaymentProcessor/1.0'
-                ]
-            ]);
-
-            $statusCode = $response->getStatusCode();
-            $body = $response->getBody()->getContents();
+            $response = $this->client->request($method, $url, $options);
             
-            if ($statusCode >= 200 && $statusCode < 300) {
-                // Success response
-                $responseData = json_decode($body, true) ?? [];
-                
-                return [
-                    'success' => true,
-                    'correlationId' => $paymentData['correlationId'],
-                    'transactionId' => $responseData['transactionId'] ?? uniqid('tx_'),
-                    'status' => 'approved',
-                    'response' => $responseData
-                ];
-            }
-
-            // HTTP error (4xx, 5xx)
             return [
-                'success' => false,
-                'correlationId' => $paymentData['correlationId'],
-                'error' => "HTTP {$statusCode}: Payment processor returned error",
-                'status' => 'failed',
-                'http_code' => $statusCode
+                'success' => true,
+                'status_code' => $response->getStatusCode(),
+                'headers' => $response->getHeaders(),
+                'body' => $response->getBody()->getContents(),
+                'response' => $response
             ];
 
         } catch (ConnectException $e) {
-            // Network/connection issues
             return [
                 'success' => false,
-                'correlationId' => $paymentData['correlationId'],
-                'error' => 'Payment processor unavailable: ' . $e->getMessage(),
-                'status' => 'failed',
+                'error' => 'Connection failed: ' . $e->getMessage(),
                 'error_type' => 'connection'
             ];
             
         } catch (RequestException $e) {
-            // Other request issues
             return [
                 'success' => false,
-                'correlationId' => $paymentData['correlationId'],
-                'error' => 'Payment request failed: ' . $e->getMessage(),
-                'status' => 'failed',
+                'error' => 'Request failed: ' . $e->getMessage(),
                 'error_type' => 'request'
             ];
             
         } catch (\Exception $e) {
-            // Unexpected errors
             return [
                 'success' => false,
-                'correlationId' => $paymentData['correlationId'],
                 'error' => 'Unexpected error: ' . $e->getMessage(),
-                'status' => 'failed',
                 'error_type' => 'unexpected'
             ];
         }
+    }
+
+    /**
+     * Convenience methods for common HTTP verbs
+     */
+    public function get(string $url, array $options = []): array
+    {
+        return $this->request('GET', $url, $options);
+    }
+
+    public function post(string $url, array $options = []): array
+    {
+        return $this->request('POST', $url, $options);
+    }
+
+    public function put(string $url, array $options = []): array
+    {
+        return $this->request('PUT', $url, $options);
+    }
+
+    public function delete(string $url, array $options = []): array
+    {
+        return $this->request('DELETE', $url, $options);
     }
 }

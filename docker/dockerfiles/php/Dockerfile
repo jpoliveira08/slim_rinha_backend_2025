@@ -20,6 +20,9 @@ RUN apt update \
             libonig-dev; \
     rm -rf /var/lib/apt/lists/*
 
+# Add this line to install PostgreSQL PDO extension
+RUN docker-php-ext-install pdo pdo_pgsql
+
 RUN groupadd -g $GID appuser && \
     useradd -u $UID -g appuser -m appuser
 

@@ -1,4 +1,5 @@
 <?php
+// filepath: /home/jpoliveira08/projetos/rinha_backend/2025/slim/public/index.php
 
 declare(strict_types=1);
 
@@ -8,10 +9,13 @@ use Predis\Client as RedisClient;
 use Slim\Factory\AppFactory;
 use RinhaSlim\App\Actions\PaymentProcessor\ProcessPaymentAction;
 use RinhaSlim\App\Actions\PaymentProcessor\ProcessFallbackPaymentAction;
+use RinhaSlim\App\Actions\Payment\PaymentSummaryAction;
 use RinhaSlim\App\Controllers\Payment\PaymentController;
 use RinhaSlim\App\Controllers\Payment\PaymentSummaryController;
 use RinhaSlim\App\Actions\Queue\EnqueuePaymentAction;
 use RinhaSlim\App\Infrastructure\Http\HttpClientService;
+use RinhaSlim\App\Infrastructure\Repository\PdoPaymentRepository;
+use RinhaSlim\App\Actions\Payment\StorePaymentAction;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -19,25 +23,24 @@ $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
 $container = new Container();
+
+// Environment variables
 $container->set('payment.main_url', $_ENV['PAYMENT_MAIN_URL']);
 $container->set('payment.fallback_url', $_ENV['PAYMENT_FALLBACK_URL']);
 $container->set('redis.host', $_ENV['REDIS_HOST']);
 $container->set('redis.port', (int)$_ENV['REDIS_PORT']);
 
-$container->set(ProcessPaymentAction::class, function ($container) {
-    return new ProcessPaymentAction(
-        $container->get('payment.main_url'),
-        $container->get(HttpClientService::class)
-    );
+// Database configuration
+$container->set('db.dsn', $_ENV['DB_DSN'] ?? 'pgsql:host=postgres;dbname=payments');
+$container->set('db.username', $_ENV['DB_USER'] ?? 'payment_user');
+$container->set('db.password', $_ENV['DB_PASS'] ?? 'payment_pass');
+
+// HTTP Client Service
+$container->set(HttpClientService::class, function () {
+    return new HttpClientService();
 });
 
-$container->set(ProcessFallbackPaymentAction::class, function ($container) {
-    return new ProcessFallbackPaymentAction(
-        $container->get('payment.fallback_url'),
-        $container->get(HttpClientService::class)
-    );
-});
-
+// Redis Client
 $container->set(RedisClient::class, function ($container) {
     return new RedisClient([
         'scheme' => 'tcp',
@@ -46,8 +49,62 @@ $container->set(RedisClient::class, function ($container) {
     ]);
 });
 
+// Database Repository
+$container->set(PdoPaymentRepository::class, function ($container) {
+    return new PdoPaymentRepository(
+        $container->get('db.dsn'),
+        $container->get('db.username'),
+        $container->get('db.password')
+    );
+});
+
+// Payment Actions
+$container->set(ProcessPaymentAction::class, function ($container) {
+    return new ProcessPaymentAction(
+        $container->get('payment.main_url'),
+        $container->get(HttpClientService::class),
+        $container->get(StorePaymentAction::class)
+    );
+});
+
+$container->set(ProcessFallbackPaymentAction::class, function ($container) {
+    return new ProcessFallbackPaymentAction(
+        $container->get('payment.fallback_url'),
+        $container->get(HttpClientService::class),
+        $container->get(StorePaymentAction::class)
+    );
+});
+
 $container->set(EnqueuePaymentAction::class, function ($container) {
     return new EnqueuePaymentAction($container->get(RedisClient::class));
+});
+
+// Payment Summary Action
+$container->set(PaymentSummaryAction::class, function ($container) {
+    return new PaymentSummaryAction(
+        $container->get(PdoPaymentRepository::class)
+    );
+});
+
+// Controllers
+$container->set(PaymentController::class, function ($container) {
+    return new PaymentController(
+        $container->get(ProcessPaymentAction::class),
+        $container->get(ProcessFallbackPaymentAction::class),
+        $container->get(EnqueuePaymentAction::class)
+    );
+});
+
+$container->set(PaymentSummaryController::class, function ($container) {
+    return new PaymentSummaryController(
+        $container->get(PaymentSummaryAction::class)
+    );
+});
+
+$container->set(StorePaymentAction::class, function ($container) {
+    return new StorePaymentAction(
+        $container->get(PdoPaymentRepository::class)
+    );
 });
 
 AppFactory::setContainer($container);
@@ -56,7 +113,6 @@ $app = AppFactory::create();
 $app->addBodyParsingMiddleware();
 
 $app->post('/payments', PaymentController::class);
-
 $app->get('/payments-summary', PaymentSummaryController::class);
 
 $app->run();

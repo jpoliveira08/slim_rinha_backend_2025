@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RinhaSlim\App\Actions\PaymentProcessor;
 
 use RinhaSlim\App\Infrastructure\Http\HttpClientService;
+use RinhaSlim\App\Actions\Payment\StorePaymentAction;
 use DateTimeImmutable;
 use DateTimeZone;
 
@@ -12,7 +13,8 @@ readonly class ProcessFallbackPaymentAction
 {
     public function __construct(
         private string $fallbackProcessorUrl,
-        private HttpClientService $httpClient
+        private HttpClientService $httpClient,
+        private StorePaymentAction $storePaymentAction
     ) {
     }
 
@@ -32,16 +34,18 @@ readonly class ProcessFallbackPaymentAction
         ]);
 
         // Handle fallback-specific response logic
-        $result = $this->handlePaymentResponse($response, $paymentData['correlationId']);
-        
+        $result = $this->handlePaymentResponse($response, $paymentData);
+
         // Add processor identifier to the result
         $result['processor'] = 'fallback';
         
         return $result;
     }
 
-    private function handlePaymentResponse(array $response, string $correlationId): array
+    private function handlePaymentResponse(array $response, array $paymentData): array
     {
+        $correlationId = $paymentData['correlationId'];
+        
         if (!$response['success']) {
             return [
                 'success' => false,
@@ -58,13 +62,18 @@ readonly class ProcessFallbackPaymentAction
         if ($statusCode >= 200 && $statusCode < 300) {
             $responseData = json_decode($body, true) ?? [];
             
-            return [
+            $result = [
                 'success' => true,
                 'correlationId' => $correlationId,
                 'transactionId' => $responseData['transactionId'] ?? uniqid('fallback_tx_'),
                 'status' => 'approved',
+                'amount' => $paymentData['amount'],
+                'processor' => 'fallback', // Important for audit
                 'response' => $responseData
             ];
+
+            $this->storePaymentAction->execute($result);
+            return $result;
         }
 
         // Check for duplicate correlationId error

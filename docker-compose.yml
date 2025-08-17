@@ -16,9 +16,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: '100M'
-
+          cpus: '0.3'
+          memory: 80M
+    depends_on:
+      - redis
+      - postgres
   api_2:
     container_name: rinha_slim_api_2
     build:
@@ -36,8 +38,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: '100M'
+          cpus: '0.3'
+          memory: 80M
+    depends_on:
+      - redis
+      - postgres
 
   worker:
     container_name: rinha_slim_worker
@@ -54,11 +59,12 @@ services:
       - .:/var/www/html
     depends_on:
       - redis
+      - postgres
     deploy:
       resources:
         limits:
-          cpus: '0.3'
-          memory: '80M'
+          cpus: '0.1'
+          memory: 32M
 
   nginx:
     container_name: rinha_slim_nginx
@@ -77,8 +83,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.2'
-          memory: '50M'
+          cpus: '0.1'
+          memory: 32M
 
   redis:
     container_name: rinha_slim_redis
@@ -87,15 +93,37 @@ services:
       - "6379:6379"
     networks:
       - rinha_slim
-      - payment-processor
     deploy:
       resources:
         limits:
           cpus: '0.2'
-          memory: '60M'
+          memory: 48M
+    command: redis-server --maxmemory 32mb --maxmemory-policy allkeys-lru
+
+  postgres:
+    image: postgres:15-alpine  # Lighter version
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 96M
+    environment:
+      POSTGRES_DB: ${DB_NAME:-payments}
+      POSTGRES_USER: ${DB_USER:-payment_user}
+      POSTGRES_PASSWORD: ${DB_PASS:-payment_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/config/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro  # Auto-run on first start
+    networks:
+      - rinha_slim
 
 networks:
   rinha_slim:
     driver: bridge
   payment-processor:
     external: true
+
+volumes:
+  postgres_data:

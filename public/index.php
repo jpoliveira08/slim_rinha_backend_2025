@@ -47,10 +47,7 @@ $container->set(RedisClient::class, function ($container) {
 });
 
 $container->set(EnqueuePaymentAction::class, function ($container) {
-    return new EnqueuePaymentAction($container->get(
-        RedisClient::class,
-        $container->get(HttpClientService::class)
-    ));
+    return new EnqueuePaymentAction($container->get(RedisClient::class));
 });
 
 AppFactory::setContainer($container);

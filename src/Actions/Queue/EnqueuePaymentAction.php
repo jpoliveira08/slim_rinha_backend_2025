@@ -8,6 +8,8 @@ use Predis\Client as RedisClient;
 
 readonly class EnqueuePaymentAction
 {
+    private const QUEUE = 'payment_queue';
+
     public function __construct(private RedisClient $redis)
     {
     }
@@ -21,7 +23,7 @@ readonly class EnqueuePaymentAction
                 'attempts' => 0
             ];
             
-            $this->redis->lpush('payment_queue', json_encode($queueData));
+            $this->redis->lpush(self::QUEUE, json_encode($queueData));
             
             return [
                 'success' => true,

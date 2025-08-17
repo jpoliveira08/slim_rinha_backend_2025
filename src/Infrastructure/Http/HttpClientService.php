@@ -7,6 +7,8 @@ namespace RinhaSlim\App\Infrastructure\Http;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ConnectException;
+use DateTimeZone;
+use DateTimeImmutable;
 
 readonly class HttpClientService
 {
@@ -28,7 +30,7 @@ readonly class HttpClientService
                 'json' => [
                     'correlationId' => $paymentData['correlationId'],
                     'amount' => $paymentData['amount'],
-                    'timestamp' => $paymentData['createdAt'] ?? date('Y-m-d H:i:s')
+                    'timestamp' => $paymentData['createdAt'] ?? (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format(DATE_ATOM)
                 ],
                 'headers' => [
                     'Content-Type' => 'application/json',

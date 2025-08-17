@@ -16,7 +16,7 @@ readonly class PaymentController
     public function __construct(
         private ProcessPaymentAction $processPaymentAction,
         private ProcessFallbackPaymentAction $processFallbackPaymentAction,
-        private EnqueuePaymentAction $enqueuePaymentAction  // ← Missing this!
+        private EnqueuePaymentAction $enqueuePaymentAction
     ) {
     }
 

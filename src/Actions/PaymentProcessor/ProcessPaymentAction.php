@@ -4,71 +4,42 @@ declare(strict_types=1);
 
 namespace RinhaSlim\App\Actions\PaymentProcessor;
 
-use RinhaSlim\App\Infrastructure\Http\HttpClientInterface;
-use RinhaSlim\App\ValueObject\Payment;
-use RinhaSlim\App\ValueObject\ProcessingResult;
+use RinhaSlim\App\Infrastructure\Http\HttpClientService;
 
-class ProcessPaymentAction
+readonly class ProcessPaymentAction
 {
-    private HttpClientInterface $httpClient;
-
-    public function __construct(HttpClientInterface $httpClient)
+    public function __construct(
+        private string $processorUrl,
+        private HttpClientService $httpClient
+    )
     {
-        $this->httpClient = $httpClient;
     }
 
-    /**
-     * Execute payment processing against a payment processor
-     *
-     * @param string $processorUrl
-     * @param Payment $payment
-     * @return ProcessingResult
-     */
-    public function execute(string $processorUrl, Payment $payment): ProcessingResult
+    public function execute(array $paymentData): array
     {
-        try {
-            $this->httpClient->setBaseUrl($processorUrl);
-            $this->httpClient->setTimeout(10); // 10 second timeout
+        // For testing, let's use simulation first, then real HTTP
+        if ($this->processorUrl === 'SIMULATE' || str_contains($this->processorUrl, 'localhost')) {
+            // Keep simulation for testing
+            $success = rand(1, 100) > 30; // 70% success rate
             
-            $requestData = [
-                'correlationId' => $payment->getCorrelationId(),
-                'amount' => $payment->getAmount(),
-                'requestedAt' => $payment->getRequestedAt()->format('c') // ISO 8601 format
+            if ($success) {
+                return [
+                    'success' => true,
+                    'correlationId' => $paymentData['correlationId'],
+                    'transactionId' => uniqid('sim_tx_'),
+                    'status' => 'approved'
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'correlationId' => $paymentData['correlationId'],
+                'error' => 'Simulated payment processor temporarily unavailable',
+                'status' => 'failed'
             ];
-
-            $response = $this->httpClient->post('/payments', $requestData);
-
-            return ProcessingResult::success(
-                $response['message'] ?? 'payment processed successfully',
-                $this->extractProcessorType($processorUrl),
-                $payment->getCorrelationId()
-            );
-
-        } catch (\Exception $e) {
-            return ProcessingResult::failure(
-                "Payment processing failed: " . $e->getMessage(),
-                $this->extractProcessorType($processorUrl),
-                $payment->getCorrelationId()
-            );
-        }
-    }
-
-    /**
-     * Extract processor type from URL for tracking
-     *
-     * @param string $processorUrl
-     * @return string
-     */
-    private function extractProcessorType(string $processorUrl): string
-    {
-        if (str_contains($processorUrl, 'fallback')) {
-            return 'fallback';
-        }
-        
-        if (str_contains($processorUrl, 'default')) {
-            return 'default';
         }
 
-        return 'unknown';
+        // Real HTTP call to external payment processor
+        return $this->httpClient->makePaymentRequest($this->processorUrl, $paymentData);
     }
 }

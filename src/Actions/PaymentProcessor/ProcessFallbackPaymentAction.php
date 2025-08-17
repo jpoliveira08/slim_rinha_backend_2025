@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace RinhaSlim\App\Actions\PaymentProcessor;
 
 use RinhaSlim\App\Infrastructure\Http\HttpClientService;
+use DateTimeImmutable;
+use DateTimeZone;
 
 readonly class ProcessFallbackPaymentAction
 {
@@ -16,36 +18,73 @@ readonly class ProcessFallbackPaymentAction
 
     public function execute(array $paymentData): array
     {
-        // For testing, let's use simulation first, then real HTTP
-        if ($this->fallbackProcessorUrl === 'SIMULATE' || str_contains($this->fallbackProcessorUrl, 'localhost')) {
-            // Keep simulation for testing - fallback usually more reliable
-            $success = rand(1, 100) > 15; // 85% success rate
-            
-            if ($success) {
-                return [
-                    'success' => true,
-                    'correlationId' => $paymentData['correlationId'],
-                    'transactionId' => uniqid('fallback_sim_'),
-                    'status' => 'approved',
-                    'processor' => 'fallback'
-                ];
-            }
-            
-            return [
-                'success' => false,
+        // Make HTTP request using generic client (same as main processor)
+        $response = $this->httpClient->post($this->fallbackProcessorUrl, [
+            'json' => [
                 'correlationId' => $paymentData['correlationId'],
-                'error' => 'Simulated fallback processor temporarily unavailable',
-                'status' => 'failed',
-                'processor' => 'fallback'
-            ];
-        }
+                'amount' => $paymentData['amount'],
+                'requestedAt' => $paymentData['createdAt'] ?? new DateTimeImmutable('now', new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.v\Z')
+            ],
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'User-Agent' => 'RinhaSlim-PaymentProcessor/1.0'
+            ]
+        ]);
 
-        // Real HTTP call to external fallback payment processor
-        $result = $this->httpClient->makePaymentRequest($this->fallbackProcessorUrl, $paymentData);
+        // Handle fallback-specific response logic
+        $result = $this->handlePaymentResponse($response, $paymentData['correlationId']);
         
         // Add processor identifier to the result
         $result['processor'] = 'fallback';
         
         return $result;
+    }
+
+    private function handlePaymentResponse(array $response, string $correlationId): array
+    {
+        if (!$response['success']) {
+            return [
+                'success' => false,
+                'correlationId' => $correlationId,
+                'error' => $response['error'],
+                'status' => 'failed',
+                'error_type' => $response['error_type']
+            ];
+        }
+
+        $statusCode = $response['status_code'];
+        $body = $response['body'];
+        
+        if ($statusCode >= 200 && $statusCode < 300) {
+            $responseData = json_decode($body, true) ?? [];
+            
+            return [
+                'success' => true,
+                'correlationId' => $correlationId,
+                'transactionId' => $responseData['transactionId'] ?? uniqid('fallback_tx_'),
+                'status' => 'approved',
+                'response' => $responseData
+            ];
+        }
+
+        // Check for duplicate correlationId error
+        if ($statusCode >= 400 && strpos($body, 'CorrelationId already exists') !== false) {
+            return [
+                'success' => true,
+                'correlationId' => $correlationId,
+                'transactionId' => 'duplicate_fallback_' . uniqid(),
+                'status' => 'already_processed',
+                'message' => 'Payment already processed with this correlationId'
+            ];
+        }
+
+        return [
+            'success' => false,
+            'correlationId' => $correlationId,
+            'error' => "HTTP {$statusCode}: Fallback payment processor returned error",
+            'status' => 'failed',
+            'http_code' => $statusCode,
+            'response_body' => $body
+        ];
     }
 }

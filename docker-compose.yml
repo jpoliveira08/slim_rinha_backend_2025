@@ -18,6 +18,9 @@ services:
         limits:
           cpus: '0.3'
           memory: 80M
+    depends_on:
+      - redis
+      - postgres
   api_2:
     container_name: rinha_slim_api_2
     build:
@@ -37,6 +40,9 @@ services:
         limits:
           cpus: '0.3'
           memory: 80M
+    depends_on:
+      - redis
+      - postgres
 
   worker:
     container_name: rinha_slim_worker
@@ -53,6 +59,7 @@ services:
       - .:/var/www/html
     depends_on:
       - redis
+      - postgres
     deploy:
       resources:
         limits:
@@ -104,11 +111,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-payments}
       POSTGRES_USER: ${DB_USER:-payment_user}
       POSTGRES_PASSWORD: ${DB_PASS:-payment_pass}
-      # Memory optimizations
-      POSTGRES_SHARED_BUFFERS: 16MB
-      POSTGRES_EFFECTIVE_CACHE_SIZE: 32MB
-      POSTGRES_WORK_MEM: 2MB
-      POSTGRES_MAX_CONNECTIONS: 20
     ports:
       - "5432:5432"
     volumes:

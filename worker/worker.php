@@ -26,9 +26,9 @@ $container->set('redis.host', $_ENV['REDIS_HOST']);
 $container->set('redis.port', (int)$_ENV['REDIS_PORT']);
 
 // Database configuration
-$container->set('db.dsn', $_ENV['DB_DSN'] ?? 'pgsql:host=postgres;dbname=payments');
-$container->set('db.username', $_ENV['DB_USER'] ?? 'payment_user');
-$container->set('db.password', $_ENV['DB_PASS'] ?? 'payment_pass');
++$container->set('db.dsn', $_ENV['DB_DSN'] ?? 'pgsql:host=postgres;port=5432;dbname=payments');
++$container->set('db.username', $_ENV['DB_USER'] ?? 'payment_user');
++$container->set('db.password', $_ENV['DB_PASS'] ?? 'payment_pass');
 
 // HTTP Client Service
 $container->set(HttpClientService::class, function () {

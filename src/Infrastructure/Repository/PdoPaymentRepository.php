@@ -15,7 +15,8 @@ readonly class PdoPaymentRepository
         $this->pdo = new PDO($dsn, $username, $password, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_PERSISTENT => true  // Reuse connections
+            PDO::ATTR_PERSISTENT => false,
+            PDO::ATTR_EMULATE_PREPARES => false
         ]);
     }
 
@@ -23,7 +24,10 @@ readonly class PdoPaymentRepository
     {
         $sql = "INSERT INTO payments (correlation_id, processor, amount) VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
         $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([$correlationId, $processor, $amount]);
+        $stmt->execute([$correlationId, $processor, $amount]);
+
+
+        return $stmt->rowCount() > 0;
     }
 
     public function getSummary(?string $from, ?string $to): array

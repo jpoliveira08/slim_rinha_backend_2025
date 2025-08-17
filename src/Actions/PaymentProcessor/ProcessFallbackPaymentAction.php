@@ -35,9 +35,6 @@ readonly class ProcessFallbackPaymentAction
 
         // Handle fallback-specific response logic
         $result = $this->handlePaymentResponse($response, $paymentData);
-
-        // Add processor identifier to the result
-        $result['processor'] = 'fallback';
         
         return $result;
     }
